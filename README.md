@@ -23,6 +23,11 @@ Chris is behind, Bo has this week's work still to do, and Dana has finished
 everything but pushed nothing inside this week's window, which is what the red
 `3` under weekly commit activity means.
 
+And the two digests as they arrive in the group chat, Thursday's status report
+above and Friday's week ahead below:
+
+<img src="docs/telegram.png" alt="The two Telegram digests" width="420">
+
 ## Setup
 
 You need a Cloudflare account (the free plan is enough) and a Telegram bot.
