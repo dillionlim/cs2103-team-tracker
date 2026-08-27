@@ -13,14 +13,13 @@ Cloudflare Worker filters them down to one single team and posts two Telegram di
 Everything team-specific is configuration. Point it at your own roster and it
 works for any team in the course.
 
-## What it looks like
+## Demo
 
 ![The dashboard, showing a sample team](docs/dashboard.png)
 
-Sample data, not a real team. Everyone's increments, Git items, participation and
-forum posts sit side by side, and the summary cards call out what is outstanding:
-Chris is behind, Bo has this week's work still to do, and Dana has finished
-everything but pushed nothing inside this week's window, which is what the red
+Everyone's increments, Git items, participation and forum posts sit side by side, 
+and the summary shows what is outstanding: Chris is behind, Bo has this week's work still to do, 
+and Dana has finished everything but pushed nothing inside this week's window, which is what the red
 `3` under weekly commit activity means.
 
 And the two digests as they arrive in the group chat, Thursday's status report
@@ -31,6 +30,15 @@ above and Friday's week ahead below:
 ## Setup
 
 You need a Cloudflare account (the free plan is enough) and a Telegram bot.
+
+```sh
+git clone https://github.com/dillionlim/cs2103-team-tracker.git
+cd cs2103-team-tracker
+npm install
+```
+
+`npm install` pins Wrangler for this project. Every command below is an npm
+script, so it uses that pinned copy rather than prompting to download one.
 
 **1. Get the ids.** Open the [iP progress dashboard][ip] and find your teammates'
 rows. Each is labelled `A---1234A`; the part after the dashes is the id to use.
@@ -74,15 +82,15 @@ It's the `message.chat.id`, negative for groups.
 **4. Set the secrets.**
 
 ```sh
-npx wrangler secret put TELEGRAM_BOT_TOKEN
-npx wrangler secret put TELEGRAM_CHAT_ID
-npx wrangler secret put DIGEST_KEY      # any random string; guards /api/digest
+npm run secret TELEGRAM_BOT_TOKEN
+npm run secret TELEGRAM_CHAT_ID
+npm run secret DIGEST_KEY      # any random string; guards /api/digest
 ```
 
 **5. Deploy.**
 
 ```sh
-npx wrangler deploy
+npm run deploy
 ```
 
 The URL it prints is the dashboard. Put that same URL in `PUBLIC_URL` and deploy
@@ -119,7 +127,7 @@ instead of ~2.5 MB of HTML.
 ## Development
 
 ```sh
-npx wrangler dev            # http://127.0.0.1:8787
+npm run dev                 # http://127.0.0.1:8787
 ```
 
 Local runs read secrets from `.dev.vars` (gitignored):
@@ -134,12 +142,13 @@ Note: `&send=1` against a local dev server still posts to the real group.
 
 `[observability]` is on, so every invocation, cron firings included, keeps its
 logs. Read them under Workers $\to$ your Worker $\to$ Logs, or live with
-`npx wrangler tail`, which shows each firing's `outcome`, `logs` and
+`npm run tail`, which shows each firing's `outcome`, `logs` and
 `exceptions`.
 
 ## Layout
 
 ```
+package.json           pins Wrangler and wraps the commands below
 src/index.js           the Worker: parsing, both digests, cron dispatch
 public/index.html      the dashboard page, served as a static asset
 wrangler.example.toml  copy to wrangler.toml: roster, course URL, cron schedule

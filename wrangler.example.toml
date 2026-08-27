@@ -9,6 +9,10 @@ compatibility_date = "2026-08-01"
 [observability]
 enabled = true
 
+# One public URL is enough for a page that names people; without this, every
+# deployment also gets its own preview URL.
+preview_urls = false
+
 [assets]
 directory = "./public"
 binding = "ASSETS"
