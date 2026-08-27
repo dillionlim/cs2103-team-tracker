@@ -13,6 +13,16 @@ Cloudflare Worker filters them down to one single team and posts two Telegram di
 Everything team-specific is configuration. Point it at your own roster and it
 works for any team in the course.
 
+## What it looks like
+
+![The dashboard, showing a sample team](docs/dashboard.png)
+
+Sample data, not a real team. Everyone's increments, Git items, participation and
+forum posts sit side by side, and the summary cards call out what is outstanding:
+Chris is behind, Bo has this week's work still to do, and Dana has finished
+everything but pushed nothing inside this week's window, which is what the red
+`3` under weekly commit activity means.
+
 ## Setup
 
 You need a Cloudflare account (the free plan is enough) and a Telegram bot.
