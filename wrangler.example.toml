@@ -1,0 +1,47 @@
+# Copy to wrangler.toml and fill in. wrangler.toml is gitignored so your roster
+# and deployment details stay out of the repo.
+
+name = "my-team-progress-tracker"
+main = "src/index.js"
+compatibility_date = "2026-08-01"
+
+# Keeps per-invocation logs (including cron firings) queryable after the fact.
+[observability]
+enabled = true
+
+[assets]
+directory = "./public"
+binding = "ASSETS"
+
+# Thu 10:00 UTC = 18:00 SGT (status) · Fri 08:00 UTC = 16:00 SGT (week ahead).
+# NOTE: Cloudflare's day-of-week is 1=Sunday..7=Saturday, so Thursday is 5 and Friday 6,
+# one ahead of standard cron. Verify in the dashboard, which spells the day out.
+# Both are UTC; shift them if your team is not in SGT. A firing that lands on a
+# Friday sends the week-ahead digest, any other day sends the status digest.
+[triggers]
+crons = ["0 10 * * 5", "0 8 * * 6"]
+
+[vars]
+# One member per line: <last 5 of student number>:<display name>:<github handle>.
+# The dashboards publish ids like "A---1234A"; use the part after the dashes.
+# The handle is only used to match the forum dashboard and may be left off.
+TEAM = """
+1234A:Alex:alex-gh
+5678B:Bo:bo-gh
+9012C:Chris:chris-gh
+"""
+
+# Shown as the page heading and at the top of every Telegram message.
+TEAM_NAME = "CS2103T W00-0"
+
+# The course website/dashboards origin; change this each semester.
+COURSE_SITE = "https://nus-cs2103-ay2627-s1.github.io"
+
+# Where this Worker is reachable, so the Telegram digests can link back to it.
+# Cron runs have no incoming request to infer it from.
+PUBLIC_URL = "https://my-team-progress-tracker.<your-subdomain>.workers.dev"
+
+# Secrets (never in this file), set with `npx wrangler secret put <NAME>`:
+#   TELEGRAM_BOT_TOKEN   from @BotFather
+#   TELEGRAM_CHAT_ID     the group to post in
+#   DIGEST_KEY           guards /api/digest

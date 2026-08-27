@@ -1,0 +1,344 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Team progress tracker</title>
+<style>
+  :root{
+    --bg:#f7f8fa; --panel:#ffffff; --line:#e4e7ec; --ink:#1b1f27; --muted:#6b7280;
+    --done:#12855b; --done-bg:#e3f5ec; --opt:#1668c4; --opt-bg:#e4eefb;
+    --over:#c2321f; --over-bg:#fbe6e2; --soon:#9a6400; --soon-bg:#fcf0da;
+    --none:#9aa2ae; --none-bg:#eef0f3; --accent:#3b5bdb;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#0f1216; --panel:#171b21; --line:#272d36; --ink:#e6e9ee; --muted:#98a1ae;
+      --done:#5fd3a0; --done-bg:#123325; --opt:#7cb4f5; --opt-bg:#132840;
+      --over:#f6907f; --over-bg:#3a1a16; --soon:#e8b761; --soon-bg:#3a2c11;
+      --none:#7b8492; --none-bg:#20252c; --accent:#8ea2ff;
+    }
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font:15px/1.5 ui-sans-serif,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    -webkit-font-smoothing:antialiased}
+  .wrap{max-width:1120px;margin:0 auto;padding:28px 20px 64px}
+  header{display:flex;flex-wrap:wrap;gap:12px 20px;align-items:baseline;justify-content:space-between}
+  h1{font-size:22px;margin:0;letter-spacing:-.02em}
+  .sub{color:var(--muted);font-size:13px}
+  .sub a{color:var(--accent)}
+  .stamps{font-size:12px;color:var(--muted);text-align:right;line-height:1.7}
+  .bar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:16px 0 22px}
+  button{font:inherit;font-size:13px;padding:7px 14px;border-radius:8px;border:1px solid var(--line);
+    background:var(--panel);color:var(--ink);cursor:pointer}
+  button:hover{border-color:var(--accent);color:var(--accent)}
+  button:disabled{opacity:.5;cursor:default}
+  #status,#next{font-size:12.5px;color:var(--muted)}
+  #next{font-variant-numeric:tabular-nums}
+  .auto{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;color:var(--muted)}
+  .auto input{accent-color:var(--accent);margin:0}
+  select{font:inherit;font-size:12.5px;padding:3px 6px;border-radius:6px;
+    border:1px solid var(--line);background:var(--panel);color:var(--ink)}
+  .dot{display:inline-block;width:7px;height:7px;border-radius:99px;background:var(--done);
+    margin-right:6px;vertical-align:middle}
+  .dot.stale{background:var(--soon)}
+
+  .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(196px,1fr));gap:12px;margin-bottom:30px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 15px}
+  .card h2{margin:0;font-size:15px;letter-spacing:-.01em}
+  .card .id{font-size:11.5px;color:var(--muted);font-variant-numeric:tabular-nums}
+  .pct{font-size:26px;font-weight:600;letter-spacing:-.03em;margin:8px 0 2px;font-variant-numeric:tabular-nums}
+  .track{height:6px;border-radius:99px;background:var(--none-bg);overflow:hidden;margin-top:6px}
+  .fill{height:100%;background:var(--done);border-radius:99px;transition:width .4s ease}
+  .flags{margin-top:9px;font-size:12px;color:var(--muted);min-height:1.4em}
+  .flags b{color:var(--over);font-weight:600}
+  .flags i{color:var(--soon);font-style:normal;font-weight:600}
+  .cardsplit{margin-top:11px;padding-top:10px;border-top:1px solid var(--line);
+    display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:12px;color:var(--muted)}
+  .cardsplit .wk{display:flex;gap:3px}
+
+  .group{font-size:17px;letter-spacing:-.01em;margin:34px 0 4px;font-weight:600}
+  .groupsub{font-size:12.5px;color:var(--muted);margin-bottom:14px}
+  .groupsub a{color:var(--accent)}
+  section{margin-bottom:22px}
+  h3{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);
+    margin:0 0 9px;font-weight:600}
+  .tablewrap{overflow-x:auto;border:1px solid var(--line);border-radius:12px;background:var(--panel)}
+  table{border-collapse:collapse;width:100%;min-width:620px}
+  th,td{text-align:left;font-size:13px}
+  thead th{background:var(--panel);border-bottom:1px solid var(--line);
+    padding:10px 12px;font-weight:600;font-size:12.5px;white-space:nowrap}
+  thead th:first-child{width:34%}
+  tbody td{border-top:1px solid var(--line);padding:7px 12px;vertical-align:middle}
+  tbody tr:hover td{background:color-mix(in srgb,var(--accent) 5%,transparent)}
+  .item{font-weight:500}
+  .pill{display:inline-flex;align-items:center;gap:5px;padding:2.5px 9px;border-radius:99px;
+    font-size:12px;font-weight:600;white-space:nowrap}
+  .s-done,.s-met{color:var(--done);background:var(--done-bg)}
+  .s-done-opt{color:var(--opt);background:var(--opt-bg)}
+  .s-overdue,.s-none{color:var(--over);background:var(--over-bg)}
+  .s-soon,.s-short{color:var(--soon);background:var(--soon-bg)}
+  .s-soon-opt{color:var(--none);background:var(--none-bg)}
+  .s-missing{color:var(--none)}
+  .codes{display:flex;gap:4px;margin-top:5px;flex-wrap:wrap}
+  .code{font-size:10.5px;font-weight:700;letter-spacing:.03em;padding:1px 6px;border-radius:5px;
+    border:1px solid var(--line)}
+  .code.text-success{color:var(--done)}
+  .code.text-info{color:var(--opt)}
+  .eye{color:var(--soon)}
+  .zero{color:var(--muted)}
+  .num{font-variant-numeric:tabular-nums;font-weight:600}
+  .handle{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;color:var(--muted)}
+  .legend{display:flex;flex-wrap:wrap;gap:8px 16px;font-size:12.5px;color:var(--muted);
+    border-top:1px solid var(--line);padding-top:14px;margin-top:6px}
+  .legend span.pill{font-size:11.5px}
+  footer{margin-top:26px;font-size:12px;color:var(--muted);border-top:1px solid var(--line);padding-top:14px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1 id="title">Team progress tracker</h1>
+      <div class="sub" id="sources">Live from the official course dashboards</div>
+    </div>
+    <div class="stamps" id="stamps"></div>
+  </header>
+
+  <div class="bar">
+    <button id="refresh">Refresh now</button>
+    <label class="auto"><input type="checkbox" id="auto" checked> Auto-refresh every
+      <select id="every">
+        <option value="60000">1 min</option>
+        <option value="300000" selected>5 min</option>
+        <option value="900000">15 min</option>
+        <option value="3600000">1 hour</option>
+      </select>
+    </label>
+    <span id="status">Loading…</span>
+    <span id="next"></span>
+  </div>
+
+  <div class="cards" id="cards"></div>
+
+  <div class="group">Participation</div>
+  <div class="groupsub">A week counts once you clear the <em>participation bar</em>: more than half that week's available points. Updated weekly at source.</div>
+  <div id="partsec"></div>
+  <div class="legend">
+    <span><span class="pill s-met">Bar reached</span></span>
+    <span><span class="pill s-short">Some points, short of bar</span></span>
+    <span><span class="pill s-none">No points</span></span>
+    <span>Letters are the source's own activity codes (<span class="code text-success">Q</span> quiz, plus <span class="code text-success">S</span> / <span class="code text-info">W</span> / <span class="code text-info">B</span>; the source doesn't expand them)</span>
+  </div>
+
+  <div class="group">Forum activity</div>
+  <div class="groupsub">Post counts from the forum dashboard, matched by GitHub handle. Anyone not listed there has posted nothing yet. Updated weekly at source.</div>
+  <div id="forumsec"></div>
+  <div class="legend">
+    <span><span class="eye">&#128065;</span> watching the forum (kudos from the teaching team)</span>
+    <span>Rank is position in the source's full leaderboard.</span>
+  </div>
+
+  <div class="group">iP progress</div>
+  <div class="groupsub">Increment tags and Git/GitHub items. Regenerated daily at source; if something you did isn't green, check the tag was pushed and named exactly.</div>
+  <div id="ipsec"></div>
+  <div class="legend">
+    <span><span class="pill s-done">Done</span></span>
+    <span><span class="pill s-done-opt">Done (optional)</span></span>
+    <span><span class="pill s-overdue">Overdue</span></span>
+    <span><span class="pill s-soon">Due soon</span></span>
+    <span><span class="pill s-soon-opt">Optional, due soon</span></span>
+    <span><span class="s-missing">—</span> not listed for that student</span>
+    <span><b>Weekly commit activity</b> asks only whether you pushed <em>any</em> commit inside that week's window (Fri 4:00 pm to next Fri 3:59 pm); it is not a measure of increments done. Finish everything early and push nothing this week and the week still comes up <span class="pill s-overdue">red</span>.</span>
+  </div>
+
+  <footer>The Worker fetches and parses all three source dashboards at the edge and hands this page a few KB of JSON, refreshed on load, on the interval above, and whenever you return to the tab. If one source fails the other two still render and the status line names the one that did not.</footer>
+</div>
+
+<script>
+const IPSECTIONS = [
+  ["weeks", "Weekly commit activity", "Week", it => it.status === "done" ? "done" : "overdue"],
+  ["increments", "Increments"],
+  ["git", "Git & GitHub"],
+];
+const DONE = new Set(["done","done-opt"]);
+
+const $ = s => document.querySelector(s);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+function order(people, key){
+  const seen = new Set();
+  people.forEach(p => p[key].forEach(it => seen.add(it.label)));
+  return [...seen];
+}
+
+function matrix(people, key, title, pre, cls){
+  const items = order(people, key);
+  if (!items.length) return "";
+  const head = people.map(p => `<th>${esc(p.name)}</th>`).join("");
+  const body = items.map(label => {
+    const cells = people.map(p => {
+      const it = p[key].find(x => x.label === label);
+      return it ? `<td><span class="pill s-${cls ? cls(it) : it.status}">${esc(it.label)}</span></td>`
+                : `<td><span class="s-missing">—</span></td>`;
+    }).join("");
+    return `<tr><td class="item">${esc(pre ? pre + " " + label : label)}</td>${cells}</tr>`;
+  }).join("");
+  return `<section><h3>${esc(title)}</h3><div class="tablewrap"><table>
+    <thead><tr><th>${esc(pre || "Item")}</th>${head}</tr></thead><tbody>${body}</tbody></table></div></section>`;
+}
+
+function render(data, note){
+  if (data.team){
+    document.title = `${data.team} progress tracker`;
+    $("#title").textContent = `${data.team}: progress tracker`;
+  }
+  const src = data.sources || {};
+  const link = (u, t) => u ? `<a href="${esc(u)}" target="_blank" rel="noopener">${t}</a>` : t;
+  $("#sources").innerHTML = "Live from the official "
+    + [link(src.ip, "iP progress"), link(src.participation, "participation"),
+       link(src.forum, "forum")].join(" and ") + " dashboards";
+
+  $("#stamps").innerHTML =
+    `iP source updated ${esc(data.sourceUpdated)}`
+  + `<br>Participation source updated ${esc(data.partUpdated)}`
+  + `<br>Forum source updated ${esc(data.forumUpdated)}`;
+
+  $("#cards").innerHTML = data.people.map(p => {
+    // Weekly badges track commits pushed inside a window, not items completed,
+    // so they are reported separately instead of diluting the item count.
+    const all = [...p.increments, ...p.git];
+    const done = all.filter(i => DONE.has(i.status)).length;
+    const pct = all.length ? Math.round(done / all.length * 100) : 0;
+    const over = all.filter(i => i.status === "overdue").length;
+    const soon = all.filter(i => i.status === "soon").length;
+    const opt  = all.filter(i => i.status === "soon-opt").length;
+    const noPush = p.weeks.filter(w => w.status !== "done").map(w => w.label);
+    const flags = [];
+    if (over) flags.push(`<b>${over} overdue</b>`);
+    if (soon) flags.push(`<i>${soon} due soon</i>`);
+    if (opt) flags.push(`${opt} optional due soon`);
+    if (noPush.length) flags.push(`<b>no commits in wk ${noPush.join(", ")}</b>`);
+    const pw = (p.part && p.part.weeks) || [];
+    const chips = pw.map(w => `<span class="pill s-${w.status}">${esc(w.label)}</span>`).join("");
+    const tot = p.part && p.part.total != null ? p.part.total : "–";
+    const posts = p.forum ? p.forum.posts : 0;
+    return `<div class="card">
+      <h2>${esc(p.name)}</h2>
+      <div class="id">A---${esc(p.id)}</div>
+      <div class="pct">${pct}%</div>
+      <div class="id">${done} of ${all.length} iP items done</div>
+      <div class="track"><div class="fill" style="width:${pct}%"></div></div>
+      <div class="flags">${flags.join(" &middot; ") || (all.length ? "all clear" : "not found in source")}</div>
+      <div class="cardsplit"><span>${tot} wk participated</span><span class="wk">${chips}</span></div>
+      <div class="cardsplit" style="border-top:0;padding-top:2px;margin-top:0">
+        <span>${posts === 0 ? "no forum posts yet" : posts + (posts === 1 ? " forum post" : " forum posts")}</span>
+        <span>${p.forum && p.forum.watching ? '<span class="eye" title="watching the forum">&#128065;</span>' : ""}</span>
+      </div>
+    </div>`;
+  }).join("");
+
+  const weeks = [...new Set(data.people.flatMap(p => (p.part?.weeks || []).map(w => w.label)))];
+  if (weeks.length){
+    const head = data.people.map(p => `<th>${esc(p.name)}</th>`).join("");
+    const body = weeks.map(label => {
+      const cells = data.people.map(p => {
+        const w = (p.part?.weeks || []).find(x => x.label === label);
+        if (!w) return `<td><span class="s-missing">—</span></td>`;
+        const codes = (p.part?.detail || {})["W" + label] || [];
+        const chips = codes.length
+          ? `<div class="codes">${codes.map(c => `<span class="code ${esc(c.tone)}">${esc(c.code)}</span>`).join("")}</div>`
+          : "";
+        const txt = {met:"reached", short:"short of bar", none:"no points"}[w.status] || w.status;
+        return `<td><span class="pill s-${w.status}">${esc(txt)}</span>${chips}</td>`;
+      }).join("");
+      return `<tr><td class="item">Week ${esc(label)}</td>${cells}</tr>`;
+    }).join("");
+    const totals = data.people.map(p =>
+      `<td><strong>${p.part?.total != null ? p.part.total : "–"}</strong></td>`).join("");
+    $("#partsec").innerHTML = `<section><h3>Weeks participated</h3><div class="tablewrap"><table>
+      <thead><tr><th>Week</th>${head}</tr></thead><tbody>${body}
+      <tr><td class="item">Total weeks</td>${totals}</tr></tbody></table></div></section>`;
+  } else {
+    $("#partsec").innerHTML = `<div class="sub">No participation rows found.</div>`;
+  }
+
+  const maxPosts = Math.max(1, ...data.people.map(p => (p.forum ? p.forum.posts : 0)));
+  $("#forumsec").innerHTML = `<section><h3>Forum posts</h3><div class="tablewrap"><table>
+    <thead><tr><th>Person</th><th>GitHub handle</th><th>Posts</th><th>Rank</th><th>Watching</th></tr></thead>
+    <tbody>${data.people.map(p => {
+      const f = p.forum || {handle: "", posts: 0, rank: null, watching: false};
+      const w = Math.round(f.posts / maxPosts * 100);
+      return `<tr>
+        <td class="item">${esc(p.name)}</td>
+        <td class="handle">${f.handle ? "@" + esc(f.handle) : '<span class="s-missing">not set</span>'}</td>
+        <td><span class="num ${f.posts ? "" : "zero"}">${f.posts}</span>
+            <div class="track" style="width:110px;margin-top:5px"><div class="fill" style="width:${w}%"></div></div></td>
+        <td>${f.rank ? `#${f.rank}${data.forumListed ? " of " + data.forumListed : ""}` : '<span class="s-missing">not listed</span>'}</td>
+        <td>${f.watching ? '<span class="eye">&#128065;</span>' : '<span class="s-missing">—</span>'}</td>
+      </tr>`;
+    }).join("")}</tbody></table></div></section>`;
+
+  $("#ipsec").innerHTML = IPSECTIONS.map(([k, t, pre, cls]) => matrix(data.people, k, t, pre, cls)).join("");
+  $("#status").innerHTML = note;
+}
+
+let lastLoad = 0;
+
+async function load(){
+  const btn = $("#refresh");
+  btn.disabled = true;
+  $("#status").textContent = "Fetching latest…";
+  try {
+    const res = await fetch("/api/data", {cache: "no-store"});
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    const data = await res.json();
+    lastLoad = Date.now();
+    const t = new Date().toLocaleTimeString([], {hour: "2-digit", minute: "2-digit"});
+    render(data, data.problems && data.problems.length
+      ? `<span class="dot stale"></span>Partly from snapshot &mdash; ${esc(data.problems.join("; "))}`
+      : `<span class="dot"></span>Live &middot; all three sources pulled at ${t}`);
+  } catch (e) {
+    $("#status").innerHTML = `<span class="dot stale"></span>Could not reach the Worker (${esc(e.message)})`
+      + (lastLoad ? " &mdash; figures below are from the last successful load."
+                  : " &mdash; nothing loaded yet, try Refresh.");
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+let timer = null, tick = null, nextAt = 0;
+
+function stopAuto(){
+  clearInterval(timer); clearInterval(tick);
+  timer = tick = null;
+  $("#next").textContent = "";
+}
+
+function startAuto(){
+  stopAuto();
+  if (!$("#auto").checked) return;
+  const every = +$("#every").value;
+  nextAt = Date.now() + every;
+  timer = setInterval(() => { nextAt = Date.now() + every; load(); }, every);
+  tick = setInterval(() => {
+    const s = Math.max(0, Math.round((nextAt - Date.now()) / 1000));
+    const mm = String(Math.floor(s / 60)).padStart(2, "0");
+    const ss = String(s % 60).padStart(2, "0");
+    $("#next").textContent = `next in ${mm}:${ss}`;
+  }, 1000);
+}
+
+$("#refresh").addEventListener("click", () => { load(); startAuto(); });
+$("#auto").addEventListener("change", startAuto);
+$("#every").addEventListener("change", startAuto);
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState !== "visible") return;
+  if ($("#auto").checked && Date.now() - lastLoad > 60000) { load(); startAuto(); }
+});
+
+load();
+startAuto();
+</script>
+</body>
+</html>
