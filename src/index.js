@@ -44,8 +44,11 @@ function config(env, request){
     self: (env.PUBLIC_URL || (request ? new URL(request.url).origin : "")).replace(/\/+$/, ""),
     src: {
       ip:    `${site}/dashboards/contents/ip-progress.html`,
+      tp:    `${site}/dashboards/contents/tp-progress.html`,
       part:  `${site}/dashboards/contents/participation.html`,
       forum: `${site}/dashboards/contents/forum-activities.html`,
+      ipc:   `${site}/dashboards/contents/ip-comments.html`,
+      tpc:   `${site}/dashboards/contents/tp-comments.html`,
       vue:   `${site}/dashboards/contents/ip-progress.page-vue-render.js`,
       sched: `${site}/website/schedule`,
     },
@@ -91,10 +94,15 @@ function rowsOf(html){
 const cellsOf = row => [...row.matchAll(/<td[^>]*>([\s\S]*?)<\/td>/g)].map(m => m[1]);
 
 const badgesOf = (cell, map) => cell
-  ? [...cell.matchAll(BADGE)].map(m => ({
-      label: strip(m[2]).replace(/^\s*!\s*/, "").trim(),
-      status: map[m[1].split(" ")[0]] || "unknown",
-    }))
+  ? [...cell.matchAll(BADGE)]
+      // The tP table wraps its badges in a panel whose "details ☰" toggle is a
+      // badge too; it is chrome, not an item. Participation's activity codes are
+      // also bg-light, but those are read by parsePart's own tokeniser.
+      .filter(m => !/\bbg-light\b/.test(m[1]))
+      .map(m => ({
+        label: strip(m[2]).replace(/^\s*!\s*/, "").trim(),
+        status: map[m[1].split(" ")[0]] || "unknown",
+      }))
   : [];
 
 // Sources regenerate daily/weekly, so a few minutes of edge cache costs nothing.
@@ -102,7 +110,7 @@ const grab = (url, ttl = 240) => fetch(url, {cf: {cacheTtl: ttl, cacheEverything
   .then(r => { if (!r.ok) throw new Error("HTTP " + r.status); return r.text(); });
 
 // ---------------------------------------------------------------------------
-// The three dashboards
+// The six dashboards
 // ---------------------------------------------------------------------------
 
 function parseIp(html, people){
@@ -113,6 +121,20 @@ function parseIp(html, people){
       weeks:      badgesOf(tds[1], IPCLS),
       increments: badgesOf(tds[2], IPCLS),
       git:        badgesOf(tds[3], IPCLS),
+    };
+  }
+  return {by, updated: stamp(html)};
+}
+
+// Same table and badge vocabulary as the iP dashboard: weekly progress is the
+// weeks code reached the team repo, individual tasks are the rest.
+function parseTp(html, people){
+  const rows = rowsOf(html), by = {};
+  for (const p of people){
+    const tds = rows[p.id] ? cellsOf(rows[p.id]) : [];
+    by[p.id] = {
+      tpweeks: badgesOf(tds[1], IPCLS),
+      tptasks: badgesOf(tds[2], IPCLS),
     };
   }
   return {by, updated: stamp(html)};
@@ -142,29 +164,32 @@ function parsePart(html, people){
   return {by, updated: stamp(html)};
 }
 
-// The forum page has no table: each poster is an <h3> like
-// "30. TAN AH KOW @ahkow (1 posts)". Anyone absent has posted nothing.
-function parseForum(html, people){
+// The forum and the two review-comment pages have no table: each person is an
+// <h3> like "30. TAN AH KOW @ahkow (1 posts)" / "(4 comments)", ranked. Anyone
+// absent has none. A page the teaching team has not started publishing parses
+// cleanly to zero entries, which is how the tP comments board reads for now.
+function parseBoard(html, people, noun){
+  const re = new RegExp("^(\\d+)\\.\\s*(.*?)\\s*@([\\w.-]+)\\s*\\((\\d+)\\s*" + noun + "s?\\)");
   const found = {};
   let listed = 0;
   for (const m of html.matchAll(/<h3 id="[^"]*">([\s\S]*?)<\/h3>/g)){
     const txt = strip(m[1]).replace(/\s+/g, " ").trim();
-    const e = txt.match(/^(\d+)\.\s*(.*?)\s*@([\w.-]+)\s*\((\d+)\s*posts?\)/);
+    const e = txt.match(re);
     if (!e) continue;
     listed++;
-    found[e[3].toLowerCase()] = {rank: +e[1], posts: +e[4], watching: /class="text-warning"/.test(m[1])};
+    found[e[3].toLowerCase()] = {rank: +e[1], n: +e[4], watching: /class="text-warning"/.test(m[1])};
   }
   const by = {};
   for (const p of people)
     by[p.id] = {handle: p.handle,
-                ...(found[p.handle.toLowerCase()] || {rank: null, posts: 0, watching: false})};
+                ...(found[p.handle.toLowerCase()] || {rank: null, n: 0, watching: false})};
   return {by, listed, updated: stamp(html)};
 }
 
 async function collect(cfg){
   const {people, src} = cfg;
-  const [ipR, partR, forumR] =
-    await Promise.allSettled([grab(src.ip), grab(src.part), grab(src.forum)]);
+  const [ipR, tpR, partR, forumR, ipcR, tpcR] = await Promise.allSettled(
+    [src.ip, src.tp, src.part, src.forum, src.ipc, src.tpc].map(u => grab(u)));
   const problems = [];
   const run = (res, fn, label) => {
     if (res.status === "rejected"){ problems.push(`${label}: ${res.reason.message}`); return null; }
@@ -173,8 +198,11 @@ async function collect(cfg){
   };
 
   let ip = run(ipR, parseIp, "iP");
+  const tp    = run(tpR,    parseTp,    "tP");
   const part  = run(partR,  parsePart,  "participation");
-  const forum = run(forumR, parseForum, "forum");
+  const forum = run(forumR, (h, pe) => parseBoard(h, pe, "post"),    "forum");
+  const ipc   = run(ipcR,   (h, pe) => parseBoard(h, pe, "comment"), "iP comments");
+  const tpc   = run(tpcR,   (h, pe) => parseBoard(h, pe, "comment"), "tP comments");
   if (ip){
     const missing = people.filter(p => !ip.by[p.id].increments.length && !ip.by[p.id].git.length);
     if (missing.length === people.length){
@@ -185,20 +213,30 @@ async function collect(cfg){
     }
   }
 
+  const none = {handle: "", rank: null, n: 0, watching: false};
   return {
     team: cfg.team,
-    sources: {ip: src.ip, participation: src.part, forum: src.forum},
+    sources: {ip: src.ip, tp: src.tp, participation: src.part,
+              forum: src.forum, ipComments: src.ipc, tpComments: src.tpc},
     sourceUpdated: ip    ? ip.updated    : "unavailable",
+    tpUpdated:     tp    ? tp.updated    : "unavailable",
     partUpdated:   part  ? part.updated  : "unavailable",
     forumUpdated:  forum ? forum.updated : "unavailable",
+    ipcUpdated:    ipc   ? ipc.updated   : "unavailable",
+    tpcUpdated:    tpc   ? tpc.updated   : "unavailable",
     forumListed:   forum ? forum.listed  : null,
+    ipcListed:     ipc   ? ipc.listed    : null,
+    tpcListed:     tpc   ? tpc.listed    : null,
     fetchedAt: new Date().toISOString(),
     problems,
     people: people.map(p => ({
       id: p.id, name: p.name,
       ...(ip ? ip.by[p.id] : {weeks: [], increments: [], git: []}),
+      ...(tp ? tp.by[p.id] : {tpweeks: [], tptasks: []}),
       part:  part  ? part.by[p.id]  : {weeks: [], total: null, detail: {}},
-      forum: forum ? forum.by[p.id] : {handle: p.handle, rank: null, posts: 0, watching: false},
+      forum: forum ? forum.by[p.id] : {...none, handle: p.handle},
+      ipc:   ipc   ? ipc.by[p.id]   : {...none, handle: p.handle},
+      tpc:   tpc   ? tpc.by[p.id]   : {...none, handle: p.handle},
     })),
   };
 }
@@ -306,7 +344,30 @@ function buildDigest(cfg, data, details){
   }
   if (clear.length) L.push(`• all clear: ${esc(clear.join(", "))}`);
 
-  // 2. Commit activity in this week's window, which is what the weekly badge tracks.
+  // 2. The same, for the tP. Stays quiet until the tP dashboard credits anything,
+  // which it does not until the team repo is up and the first tasks come due.
+  const tpAny = data.people.some(p => (p.tptasks || []).length || (p.tpweeks || []).length);
+  if (tpAny){
+    L.push("");
+    L.push("<b>👥 Outstanding tP items</b>");
+    const tpClear = [];
+    for (const p of data.people){
+      const items = [...(p.tpweeks || []), ...(p.tptasks || [])];
+      const over = items.filter(i => i.status === "overdue");
+      const soon = items.filter(i => i.status === "soon");
+      const opt  = items.filter(i => i.status === "soon-opt");
+      if (!over.length && !soon.length && !opt.length){ tpClear.push(p.name); continue; }
+      const list = a => esc(a.map(i => i.label).join(", "));
+      const bits = [];
+      if (over.length) bits.push(`<b>${over.length} overdue</b> (${list(over)})`);
+      if (soon.length) bits.push(`${soon.length} due soon (${list(soon)})`);
+      if (opt.length)  bits.push(`${opt.length} optional due soon (${list(opt)})`);
+      L.push(`• <b>${esc(p.name)}</b>: ${bits.join("; ")}`);
+    }
+    if (tpClear.length) L.push(`• all clear: ${esc(tpClear.join(", "))}`);
+  }
+
+  // 3. Commit activity in this week's window, which is what the weekly badge tracks.
   if (cur){
     L.push("");
     L.push(`<b>💻 Commits pushed in week ${cur.label}</b>`);
@@ -317,7 +378,7 @@ function buildDigest(cfg, data, details){
     })));
   }
 
-  // 3. Participation so far. The denominator is how many weeks the source has
+  // 4. Participation so far. The denominator is how many weeks the source has
   // published, not the best score on the team, since otherwise a week the whole team
   // missed would quietly disappear from the count.
   L.push("");
@@ -338,12 +399,23 @@ function buildDigest(cfg, data, details){
     return `${esc(p.name)} ${n - m.length}/${n}${m.length ? ` (missed wk ${m.join(", ")})` : ""}`;
   })));
 
-  // 4. Forum.
+  // 5. Forum.
   L.push("");
   L.push("<b>💬 Forum posts</b>");
   L.push(join(data.people.map(p => {
-    const f = p.forum || {posts: 0};
-    return `${esc(p.name)} ${f.posts}${f.watching ? " 👁" : ""}`;
+    const f = p.forum || {n: 0};
+    return `${esc(p.name)} ${f.n}${f.watching ? " 👁" : ""}`;
+  })));
+
+  // 6. Review comments given on other people's PRs. The tP board is folded in
+  // only once the teaching team starts publishing it.
+  const tpcAny = data.people.some(p => p.tpc && p.tpc.n);
+  L.push("");
+  L.push(`<b>🔍 Review comments given</b>${tpcAny ? " (iP + tP)" : ""}`);
+  L.push(join(data.people.map(p => {
+    const a = (p.ipc && p.ipc.n) || 0, b = (p.tpc && p.tpc.n) || 0;
+    const rank = p.ipc && p.ipc.rank && data.ipcListed ? ` (#${p.ipc.rank})` : "";
+    return `${esc(p.name)} ${tpcAny ? `${a}+${b}` : a}${rank}`;
   })));
 
   L.push("");

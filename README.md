@@ -3,10 +3,12 @@
 The official CS2103/T dashboards cover the whole cohort and are anonymous. This
 Cloudflare Worker filters them down to one single team and posts two Telegram digests a week.
 
-- **A live dashboard.** iP increments, Git/GitHub items, participation and forum
-  posts for your team, side by side, auto-refreshing.
-- **Thursday 6pm SGT: status.** Who still has something outstanding, how many
-  commits each person pushed this week, participation so far, forum post counts.
+- **A live dashboard.** iP increments, Git/GitHub items, tP progress,
+  participation, forum posts and PR review comments for your team, side by side,
+  auto-refreshing.
+- **Thursday 6pm SGT: status.** Who still has something outstanding on the iP and
+  the tP, how many commits each person pushed this week, participation so far,
+  forum post counts, review comments given.
 - **Friday 4pm SGT: the week ahead.** The Admin / iP / tP task lists for the week
   that starts at that moment, with every deadline.
 
@@ -120,9 +122,11 @@ otherwise spam your group chat.
 
 ## How it reads the sources
 
-The three dashboards are MarkBind pages whose tables are server-rendered, so the
-Worker fetches and parses them at the edge and hands the browser ~9 KB of JSON
-instead of ~2.5 MB of HTML. 
+The six dashboards are MarkBind pages whose tables are server-rendered, so the
+Worker fetches and parses them at the edge and hands the browser ~16 KB of JSON
+instead of ~5.5 MB of HTML. A dashboard the teaching team has not started
+publishing yet (tP comments, for most of the semester) parses to zero entries and
+the page says so, rather than erroring. 
 
 ## Development
 
@@ -156,3 +160,6 @@ wrangler.example.toml  copy to wrangler.toml: roster, course URL, cron schedule
 
 [ip]: https://nus-cs2103-ay2627-s1.github.io/dashboards/contents/ip-progress.html
 [forum]: https://nus-cs2103-ay2627-s1.github.io/dashboards/contents/forum-activities.html
+[tp]: https://nus-cs2103-ay2627-s1.github.io/dashboards/contents/tp-progress.html
+[ipc]: https://nus-cs2103-ay2627-s1.github.io/dashboards/contents/ip-comments.html
+[tpc]: https://nus-cs2103-ay2627-s1.github.io/dashboards/contents/tp-comments.html

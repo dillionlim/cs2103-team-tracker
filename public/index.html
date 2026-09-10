@@ -153,7 +153,27 @@
     <span><b>Weekly commit activity</b> asks only whether you pushed <em>any</em> commit inside that week's window (Fri 4:00 pm to next Fri 3:59 pm); it is not a measure of increments done. Finish everything early and push nothing this week and the week still comes up <span class="pill s-overdue">red</span>.</span>
   </div>
 
-  <footer>The Worker fetches and parses all three source dashboards at the edge and hands this page a few KB of JSON, refreshed on load, on the interval above, and whenever you return to the tab. If one source fails the other two still render and the status line names the one that did not.</footer>
+  <div class="group">tP progress</div>
+  <div class="groupsub">Weekly progress is the weeks you committed code to the team repo; individual tasks are the other tP items credited to you personally. Regenerated daily at source.</div>
+  <div id="tpsec"></div>
+  <div class="legend">
+    <span><span class="pill s-done">Done</span></span>
+    <span><span class="pill s-done-opt">Done (optional)</span></span>
+    <span><span class="pill s-overdue">Overdue</span></span>
+    <span><span class="pill s-soon">Due soon</span></span>
+    <span><span class="pill s-soon-opt">Optional, due soon</span></span>
+    <span><span class="s-missing">&mdash;</span> not listed for that student</span>
+  </div>
+
+  <div class="group">Review comments</div>
+  <div class="groupsub">Review comments given on <em>others&rsquo;</em> PRs, matched by GitHub handle. Anyone not listed at source has given none. Updated weekly at source.</div>
+  <div id="cmtsec"></div>
+  <div class="legend">
+    <span>Rank is position in the source's full leaderboard.</span>
+    <span>The tP comments dashboard stays empty until the teaching team starts publishing it.</span>
+  </div>
+
+  <footer>The Worker fetches and parses all six source dashboards at the edge and hands this page a few KB of JSON, refreshed on load, on the interval above, and whenever you return to the tab. If one source fails the others still render and the status line names the one that did not.</footer>
 </div>
 
 <script>
@@ -162,13 +182,14 @@ const IPSECTIONS = [
   ["increments", "Increments"],
   ["git", "Git & GitHub"],
 ];
+const TPSECTIONS = [["tpweeks", "Weekly progress", "Week"], ["tptasks", "Individual tasks"]];
 const DONE = new Set(["done","done-opt"]);
 
 const $ = s => document.querySelector(s);
 const esc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 function order(people, key){
   const seen = new Set();
-  people.forEach(p => p[key].forEach(it => seen.add(it.label)));
+  people.forEach(p => (p[key] || []).forEach(it => seen.add(it.label)));
   return [...seen];
 }
 
@@ -178,7 +199,7 @@ function matrix(people, key, title, pre, cls){
   const head = people.map(p => `<th>${esc(p.name)}</th>`).join("");
   const body = items.map(label => {
     const cells = people.map(p => {
-      const it = p[key].find(x => x.label === label);
+      const it = (p[key] || []).find(x => x.label === label);
       return it ? `<td><span class="pill s-${cls ? cls(it) : it.status}">${esc(it.label)}</span></td>`
                 : `<td><span class="s-missing">—</span></td>`;
     }).join("");
@@ -186,6 +207,27 @@ function matrix(people, key, title, pre, cls){
   }).join("");
   return `<section><h3>${esc(title)}</h3><div class="tablewrap"><table>
     <thead><tr><th>${esc(pre || "Item")}</th>${head}</tr></thead><tbody>${body}</tbody></table></div></section>`;
+}
+
+// One leaderboard table (forum posts, iP comments, tP comments).
+function board(people, key, title, unit, listed, showWatching){
+  const max = Math.max(1, ...people.map(p => (p[key] ? p[key].n : 0)));
+  const rows = people.map(p => {
+    const f = p[key] || {handle: "", n: 0, rank: null, watching: false};
+    const w = Math.round(f.n / max * 100);
+    return `<tr>
+      <td class="item">${esc(p.name)}</td>
+      <td class="handle">${f.handle ? "@" + esc(f.handle) : '<span class="s-missing">not set</span>'}</td>
+      <td><span class="num ${f.n ? "" : "zero"}">${f.n}</span>
+          <div class="track" style="width:110px;margin-top:5px"><div class="fill" style="width:${w}%"></div></div></td>
+      <td>${f.rank ? `#${f.rank}${listed ? " of " + listed : ""}` : '<span class="s-missing">not listed</span>'}</td>
+      ${showWatching ? `<td>${f.watching ? '<span class="eye">&#128065;</span>' : '<span class="s-missing">&mdash;</span>'}</td>` : ""}
+    </tr>`;
+  }).join("");
+  return `<section><h3>${esc(title)}</h3><div class="tablewrap"><table>
+    <thead><tr><th>Person</th><th>GitHub handle</th><th>${esc(unit)}</th><th>Rank</th>${
+      showWatching ? "<th>Watching</th>" : ""}</tr></thead>
+    <tbody>${rows}</tbody></table></div></section>`;
 }
 
 function render(data, note){
@@ -196,13 +238,24 @@ function render(data, note){
   const src = data.sources || {};
   const link = (u, t) => u ? `<a href="${esc(u)}" target="_blank" rel="noopener">${t}</a>` : t;
   $("#sources").innerHTML = "Live from the official "
-    + [link(src.ip, "iP progress"), link(src.participation, "participation"),
-       link(src.forum, "forum")].join(" and ") + " dashboards";
+    + [link(src.participation, "participation"), link(src.forum, "forum"),
+       link(src.ip, "iP progress"), link(src.ipComments, "iP comments"),
+       link(src.tp, "tP progress"), link(src.tpComments, "tP comments")]
+      .join(", ").replace(/, ([^,]*)$/, " and $1") + " dashboards";
 
-  $("#stamps").innerHTML =
-    `iP source updated ${esc(data.sourceUpdated)}`
-  + `<br>Participation source updated ${esc(data.partUpdated)}`
-  + `<br>Forum source updated ${esc(data.forumUpdated)}`;
+  // A source the teaching team has not started publishing carries no
+  // "last updated on" line, so it parses to "unknown" rather than a date.
+  const when = (label, v) => /^unknown/.test(v || "")
+    ? `${label} <span class="s-missing">not published yet</span>`
+    : `${label} updated ${esc(v)}`;
+  $("#stamps").innerHTML = [
+    when("iP progress",   data.sourceUpdated),
+    when("tP progress",   data.tpUpdated),
+    when("Participation", data.partUpdated),
+    when("Forum",         data.forumUpdated),
+    when("iP comments",   data.ipcUpdated),
+    when("tP comments",   data.tpcUpdated),
+  ].join("<br>");
 
   $("#cards").innerHTML = data.people.map(p => {
     // Weekly badges track commits pushed inside a window, not items completed,
@@ -222,7 +275,12 @@ function render(data, note){
     const pw = (p.part && p.part.weeks) || [];
     const chips = pw.map(w => `<span class="pill s-${w.status}">${esc(w.label)}</span>`).join("");
     const tot = p.part && p.part.total != null ? p.part.total : "–";
-    const posts = p.forum ? p.forum.posts : 0;
+    const posts = p.forum ? p.forum.n : 0;
+    const tpAll = [...(p.tpweeks || []), ...(p.tptasks || [])];
+    const tpDone = tpAll.filter(i => DONE.has(i.status)).length;
+    const tpChips = tpAll.slice(-4).map(i =>
+      `<span class="pill s-${i.status}" title="${esc(i.label)}">${esc(i.label)}</span>`).join("");
+    const cmts = ((p.ipc && p.ipc.n) || 0) + ((p.tpc && p.tpc.n) || 0);
     return `<div class="card">
       <h2>${esc(p.name)}</h2>
       <div class="id">A---${esc(p.id)}</div>
@@ -234,6 +292,15 @@ function render(data, note){
       <div class="cardsplit" style="border-top:0;padding-top:2px;margin-top:0">
         <span>${posts === 0 ? "no forum posts yet" : posts + (posts === 1 ? " forum post" : " forum posts")}</span>
         <span>${p.forum && p.forum.watching ? '<span class="eye" title="watching the forum">&#128065;</span>' : ""}</span>
+      </div>
+      <div class="cardsplit" style="border-top:0;padding-top:2px;margin-top:0">
+        <span>${cmts === 0 ? "no review comments yet"
+                : cmts + (cmts === 1 ? " review comment" : " review comments")}</span>
+        <span>${p.ipc && p.ipc.rank ? "#" + p.ipc.rank : ""}</span>
+      </div>
+      <div class="cardsplit">
+        <span>${tpAll.length ? `tP: ${tpDone} of ${tpAll.length} done` : "tP: nothing yet"}</span>
+        <span class="wk">${tpChips}</span>
       </div>
     </div>`;
   }).join("");
@@ -263,23 +330,22 @@ function render(data, note){
     $("#partsec").innerHTML = `<div class="sub">No participation rows found.</div>`;
   }
 
-  const maxPosts = Math.max(1, ...data.people.map(p => (p.forum ? p.forum.posts : 0)));
-  $("#forumsec").innerHTML = `<section><h3>Forum posts</h3><div class="tablewrap"><table>
-    <thead><tr><th>Person</th><th>GitHub handle</th><th>Posts</th><th>Rank</th><th>Watching</th></tr></thead>
-    <tbody>${data.people.map(p => {
-      const f = p.forum || {handle: "", posts: 0, rank: null, watching: false};
-      const w = Math.round(f.posts / maxPosts * 100);
-      return `<tr>
-        <td class="item">${esc(p.name)}</td>
-        <td class="handle">${f.handle ? "@" + esc(f.handle) : '<span class="s-missing">not set</span>'}</td>
-        <td><span class="num ${f.posts ? "" : "zero"}">${f.posts}</span>
-            <div class="track" style="width:110px;margin-top:5px"><div class="fill" style="width:${w}%"></div></div></td>
-        <td>${f.rank ? `#${f.rank}${data.forumListed ? " of " + data.forumListed : ""}` : '<span class="s-missing">not listed</span>'}</td>
-        <td>${f.watching ? '<span class="eye">&#128065;</span>' : '<span class="s-missing">—</span>'}</td>
-      </tr>`;
-    }).join("")}</tbody></table></div></section>`;
+  $("#forumsec").innerHTML =
+    board(data.people, "forum", "Forum posts", "Posts", data.forumListed, true);
 
   $("#ipsec").innerHTML = IPSECTIONS.map(([k, t, pre, cls]) => matrix(data.people, k, t, pre, cls)).join("");
+
+  const tp = TPSECTIONS.map(([k, t, pre]) => matrix(data.people, k, t, pre)).join("")
+    || `<div class="sub">Nothing credited on the tP dashboard yet &mdash; it fills in once the team repo has commits and the individual tasks come due.</div>`;
+  $("#tpsec").innerHTML = tp + (data.people.some(p => (p.tpweeks || []).length) ? ""
+    : `<div class="sub">No weekly code activity on the team repo recorded yet.</div>`);
+
+  $("#cmtsec").innerHTML =
+    board(data.people, "ipc", "iP review comments given", "Comments", data.ipcListed, false)
+  + (data.tpcListed
+      ? board(data.people, "tpc", "tP review comments given", "Comments", data.tpcListed, false)
+      : `<section><h3>tP review comments given</h3>
+         <div class="sub">The source dashboard says it hasn't started publishing tP comments yet. This table appears automatically once it does.</div></section>`);
   $("#status").innerHTML = note;
 }
 
@@ -297,7 +363,7 @@ async function load(){
     const t = new Date().toLocaleTimeString([], {hour: "2-digit", minute: "2-digit"});
     render(data, data.problems && data.problems.length
       ? `<span class="dot stale"></span>Partly from snapshot &mdash; ${esc(data.problems.join("; "))}`
-      : `<span class="dot"></span>Live &middot; all three sources pulled at ${t}`);
+      : `<span class="dot"></span>Live &middot; all six sources pulled at ${t}`);
   } catch (e) {
     $("#status").innerHTML = `<span class="dot stale"></span>Could not reach the Worker (${esc(e.message)})`
       + (lastLoad ? " &mdash; figures below are from the last successful load."
