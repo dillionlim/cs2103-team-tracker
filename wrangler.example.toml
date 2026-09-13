@@ -38,6 +38,11 @@ TEAM = """
 # Shown as the page heading and at the top of every Telegram message.
 TEAM_NAME = "CS2103T W00-0"
 
+# The team dashboard keys its rows by team id, e.g. "CS2103T-T16-1". That is
+# TEAM_NAME with its spaces hyphenated, which is derived automatically; set
+# TEAM_ID only if your display name is not the id.
+# TEAM_ID = "CS2103T-T16-1"
+
 # The course website/dashboards origin; change this each semester.
 COURSE_SITE = "https://nus-cs2103-ay2627-s1.github.io"
 

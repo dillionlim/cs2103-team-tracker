@@ -89,6 +89,11 @@
   .s-soon,.s-short{color:var(--soon);background:var(--soon-bg)}
   .s-soon-opt{color:var(--none);background:var(--none-bg)}
   .s-missing{color:var(--none)}
+  /* "No data for this item yet" — deliberately unlike the solid status pills,
+     since it reports an absence of information rather than a state of the work. */
+  .s-nodata{color:var(--muted);background:transparent;border:1px dashed var(--none);
+    padding:1.5px 8px}
+  .s-nodata::after{content:"?";font-weight:700;opacity:.6}
   .codes{display:flex;gap:4px;margin-top:5px;flex-wrap:wrap}
   .code{font-size:10.5px;font-weight:700;letter-spacing:.03em;padding:1px 6px;border-radius:5px;
     border:1px solid var(--line)}
@@ -162,7 +167,7 @@
   </div>
 
   <div class="group">tP progress</div>
-  <div class="groupsub">Weekly progress is the weeks you committed code to the team repo; individual tasks are the other tP items credited to you personally. Regenerated daily at source.</div>
+  <div class="groupsub">Team tasks belong to the whole team; weekly progress is the weeks you personally committed code to the team repo, and individual tasks are the other tP items credited to you by name. Regenerated daily at source.</div>
   <div id="tpsec"></div>
   <div class="legend">
     <span><span class="pill s-done">Done</span></span>
@@ -170,6 +175,7 @@
     <span><span class="pill s-overdue">Overdue</span></span>
     <span><span class="pill s-soon">Due soon</span></span>
     <span><span class="pill s-soon-opt">Optional, due soon</span></span>
+    <span><span class="pill s-nodata">No data yet</span></span>
     <span><span class="s-missing">&mdash;</span> not listed for that student</span>
   </div>
 
@@ -181,7 +187,7 @@
     <span>The tP comments dashboard stays empty until the teaching team starts publishing it.</span>
   </div>
 
-  <footer>The Worker fetches and parses all six source dashboards at the edge and hands this page a few KB of JSON, refreshed on load, on the interval above, and whenever you return to the tab. If one source fails the others still render and the status line names the one that did not.</footer>
+  <footer>The Worker fetches and parses all seven source dashboards at the edge and hands this page a few KB of JSON, refreshed on load, on the interval above, and whenever you return to the tab. If one source fails the others still render and the status line names the one that did not.</footer>
 </div>
 
 <script>
@@ -238,6 +244,31 @@ function board(people, key, title, unit, listed, showWatching){
     <tbody>${rows}</tbody></table></div></section>`;
 }
 
+// The tP dashboard's whole-team half: tasks nobody owns individually, so they
+// are listed once rather than per person, next to the repo's CI badge.
+function teamBand(data){
+  const tasks = data.teamTasks || [];
+  if (!tasks.length && !data.ci) return "";
+  const done = tasks.filter(t => DONE.has(t.status)).length;
+  const pending = tasks.filter(t => t.status === "nodata").length;
+  const pills = tasks.map(t =>
+    `<span class="pill s-${t.status}"${t.status === "nodata"
+      ? ' title="The source has no data for this item yet"' : ""}>${esc(t.label)}</span>`).join("");
+  const ci = data.ci
+    ? `<a href="${esc(data.repo || "#")}" target="_blank" rel="noopener" title="Java CI on the team repo">
+         <img src="${esc(data.ci)}" alt="CI status" style="height:20px;vertical-align:middle"></a>`
+    : "";
+  return `<section><h3>Team tasks${data.teamId ? " &middot; " + esc(data.teamId) : ""}</h3>
+    <div class="tablewrap" style="padding:12px 14px">
+      <div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px">
+        ${pills || '<span class="sub">Nothing credited to the team yet.</span>'}
+        <span style="flex:1 1 auto"></span>${ci}
+      </div>
+      ${tasks.length ? `<div class="sub" style="margin-top:9px">${done} of ${tasks.length} done${
+        pending ? ` &middot; ${pending} awaiting data` : ""}</div>` : ""}
+    </div></section>`;
+}
+
 function render(data, note){
   if (data.team){
     document.title = `${data.team} progress tracker`;
@@ -248,7 +279,8 @@ function render(data, note){
   $("#sources").innerHTML = "Live from the official "
     + [link(src.participation, "participation"), link(src.forum, "forum"),
        link(src.ip, "iP progress"), link(src.ipComments, "iP comments"),
-       link(src.tp, "tP progress"), link(src.tpComments, "tP comments")]
+       link(src.tp, "tP progress"), link(src.tpTeam, "tP team"),
+       link(src.tpComments, "tP comments")]
       .join(", ").replace(/, ([^,]*)$/, " and $1") + " dashboards";
 
   // A source the teaching team has not started publishing carries no
@@ -259,6 +291,7 @@ function render(data, note){
   $("#stamps").innerHTML = [
     when("iP progress",   data.sourceUpdated),
     when("tP progress",   data.tpUpdated),
+    when("tP team",       data.tptUpdated),
     when("Participation", data.partUpdated),
     when("Forum",         data.forumUpdated),
     when("iP comments",   data.ipcUpdated),
@@ -343,7 +376,8 @@ function render(data, note){
 
   $("#ipsec").innerHTML = IPSECTIONS.map(([k, t, pre, cls]) => matrix(data.people, k, t, pre, cls)).join("");
 
-  const tp = TPSECTIONS.map(([k, t, pre]) => matrix(data.people, k, t, pre)).join("")
+  const tp = teamBand(data)
+    + TPSECTIONS.map(([k, t, pre]) => matrix(data.people, k, t, pre)).join("")
     || `<div class="sub">Nothing credited on the tP dashboard yet &mdash; it fills in once the team repo has commits and the individual tasks come due.</div>`;
   $("#tpsec").innerHTML = tp + (data.people.some(p => (p.tpweeks || []).length) ? ""
     : `<div class="sub">No weekly code activity on the team repo recorded yet.</div>`);
@@ -371,7 +405,7 @@ async function load(){
     const t = new Date().toLocaleTimeString([], {hour: "2-digit", minute: "2-digit"});
     render(data, data.problems && data.problems.length
       ? `<span class="dot stale"></span>Partly from snapshot &mdash; ${esc(data.problems.join("; "))}`
-      : `<span class="dot"></span>Live &middot; all six sources pulled at ${t}`);
+      : `<span class="dot"></span>Live &middot; all seven sources pulled at ${t}`);
   } catch (e) {
     $("#status").innerHTML = `<span class="dot stale"></span>Could not reach the Worker (${esc(e.message)})`
       + (lastLoad ? " &mdash; figures below are from the last successful load."

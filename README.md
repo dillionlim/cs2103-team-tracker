@@ -67,7 +67,9 @@ PUBLIC_URL = "https://<your-worker>.<your-subdomain>.workers.dev"
 ```
 
 One member per line, `id:name:handle`. The handle may be omitted (`1234A:Alex`);
-that person's forum count then reads as not set. `TEAM` also accepts a JSON
+that person's forum count then reads as not set. The whole-team half of the tP
+dashboard is looked up by team id, which is `TEAM_NAME` with its spaces
+hyphenated (`CS2103T-W00-0`); set `TEAM_ID` if your display name is not the id. `TEAM` also accepts a JSON
 array of `{"id","name","handle"}` if you prefer.
 
 **3. Make the bot.** Message [@BotFather](https://t.me/BotFather), `/newbot`, and
@@ -122,7 +124,7 @@ otherwise spam your group chat.
 
 ## How it reads the sources
 
-The six dashboards are MarkBind pages whose tables are server-rendered, so the
+The seven dashboards are MarkBind pages whose tables are server-rendered, so the
 Worker fetches and parses them at the edge and hands the browser ~16 KB of JSON
 instead of ~5.5 MB of HTML. A dashboard the teaching team has not started
 publishing yet (tP comments, for most of the semester) parses to zero entries and

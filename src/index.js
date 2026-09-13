@@ -40,11 +40,16 @@ function config(env, request){
   return {
     people: parseTeam(env.TEAM),
     team: env.TEAM_NAME || "",
+    // The team dashboard keys its rows by team id, e.g. "CS2103T-T16-1". That is
+    // TEAM_NAME with its spaces hyphenated, so derive it rather than asking for
+    // the same string twice; TEAM_ID overrides for a name that is not the id.
+    teamId: (env.TEAM_ID || env.TEAM_NAME || "").trim().replace(/\s+/g, "-"),
     // Cron runs have no request to infer the public URL from.
     self: (env.PUBLIC_URL || (request ? new URL(request.url).origin : "")).replace(/\/+$/, ""),
     src: {
       ip:    `${site}/dashboards/contents/ip-progress.html`,
       tp:    `${site}/dashboards/contents/tp-progress.html`,
+      tpTeam:`${site}/dashboards/contents/tp-progress-team.html`,
       part:  `${site}/dashboards/contents/participation.html`,
       forum: `${site}/dashboards/contents/forum-activities.html`,
       ipc:   `${site}/dashboards/contents/ip-comments.html`,
@@ -62,6 +67,8 @@ function config(env, request){
 const IPCLS = {"bg-success": "done", "bg-info": "done-opt", "bg-danger": "overdue",
                "bg-dark": "soon", "bg-secondary": "soon-opt"};
 const PCLS  = {"bg-success": "met", "bg-warning": "short", "bg-danger": "none"};
+// The two badge colours that mean the item is finished; the rest are outstanding.
+const DONE_STATUS = new Set(["done", "done-opt"]);
 
 const BADGE = /<span class="badge ([^"]*)">((?:(?!<span class="badge)[\s\S])*?)<\/span>/g;
 
@@ -99,10 +106,18 @@ const badgesOf = (cell, map) => cell
       // badge too; it is chrome, not an item. Participation's activity codes are
       // also bg-light, but those are read by parsePart's own tokeniser.
       .filter(m => !/\bbg-light\b/.test(m[1]))
-      .map(m => ({
-        label: strip(m[2]).replace(/^\s*!\s*/, "").trim(),
-        status: map[m[1].split(" ")[0]] || "unknown",
-      }))
+      .map(m => {
+        const label = strip(m[2]).replace(/^\s*!\s*/, "").trim();
+        // A "[?]" suffix means the source has no data for that item yet. It is
+        // drawn bg-dark, the same as a genuine "due soon", so the suffix is the
+        // only thing telling the two apart: give it a status of its own rather
+        // than reporting "not done yet" about something nobody has measured.
+        const pending = /\[\?\]$/.test(label);
+        return {
+          label: label.replace(/\s*\[\?\]$/, ""),
+          status: pending ? "nodata" : (map[m[1].split(" ")[0]] || "unknown"),
+        };
+      })
   : [];
 
 // Sources regenerate daily/weekly, so a few minutes of edge cache costs nothing.
@@ -138,6 +153,22 @@ function parseTp(html, people){
     };
   }
   return {by, updated: stamp(html)};
+}
+
+// The team dashboard has one row per team rather than per student: a CI status
+// badge served from GitHub, and the tP tasks the team owns collectively.
+function parseTpTeam(html, teamId){
+  const rows = rowsOf(html);
+  const tds = teamId && rows[teamId] ? cellsOf(rows[teamId]) : [];
+  const ci = tds[1] ? tds[1].match(/<img src="([^"]+)"/) : null;
+  return {
+    found: !!tds.length,
+    tasks: badgesOf(tds[2], IPCLS),
+    // The badge URL embeds the repo, which is the more useful thing to link to.
+    ci: ci ? decode(ci[1]) : null,
+    repo: ci ? decode(ci[1]).replace(/\/workflows\/.*$/, "") : null,
+    updated: stamp(html),
+  };
 }
 
 function parsePart(html, people){
@@ -188,8 +219,8 @@ function parseBoard(html, people, noun){
 
 async function collect(cfg){
   const {people, src} = cfg;
-  const [ipR, tpR, partR, forumR, ipcR, tpcR] = await Promise.allSettled(
-    [src.ip, src.tp, src.part, src.forum, src.ipc, src.tpc].map(u => grab(u)));
+  const [ipR, tpR, tptR, partR, forumR, ipcR, tpcR] = await Promise.allSettled(
+    [src.ip, src.tp, src.tpTeam, src.part, src.forum, src.ipc, src.tpc].map(u => grab(u)));
   const problems = [];
   const run = (res, fn, label) => {
     if (res.status === "rejected"){ problems.push(`${label}: ${res.reason.message}`); return null; }
@@ -199,6 +230,9 @@ async function collect(cfg){
 
   let ip = run(ipR, parseIp, "iP");
   const tp    = run(tpR,    parseTp,    "tP");
+  const tpt   = run(tptR,   h => parseTpTeam(h, cfg.teamId), "tP team");
+  if (tpt && cfg.teamId && !tpt.found)
+    problems.push(`tP team: no row for ${cfg.teamId}; check TEAM_NAME or set TEAM_ID`);
   const part  = run(partR,  parsePart,  "participation");
   const forum = run(forumR, (h, pe) => parseBoard(h, pe, "post"),    "forum");
   const ipc   = run(ipcR,   (h, pe) => parseBoard(h, pe, "comment"), "iP comments");
@@ -216,10 +250,16 @@ async function collect(cfg){
   const none = {handle: "", rank: null, n: 0, watching: false};
   return {
     team: cfg.team,
-    sources: {ip: src.ip, tp: src.tp, participation: src.part,
+    sources: {ip: src.ip, tp: src.tp, tpTeam: src.tpTeam, participation: src.part,
               forum: src.forum, ipComments: src.ipc, tpComments: src.tpc},
     sourceUpdated: ip    ? ip.updated    : "unavailable",
     tpUpdated:     tp    ? tp.updated    : "unavailable",
+    tptUpdated:    tpt   ? tpt.updated   : "unavailable",
+    teamId:        cfg.teamId,
+    // The whole-team half of the tP dashboard: shared tasks plus the CI badge.
+    teamTasks:     tpt && tpt.found ? tpt.tasks : [],
+    ci:            tpt ? tpt.ci : null,
+    repo:          tpt ? tpt.repo : null,
     partUpdated:   part  ? part.updated  : "unavailable",
     forumUpdated:  forum ? forum.updated : "unavailable",
     ipcUpdated:    ipc   ? ipc.updated   : "unavailable",
@@ -346,6 +386,18 @@ function buildDigest(cfg, data, details){
 
   // 2. The same, for the tP. Stays quiet until the tP dashboard credits anything,
   // which it does not until the team repo is up and the first tasks come due.
+  const team = data.teamTasks || [];
+  if (team.length){
+    const list = a => esc(a.map(i => i.label).join(", "));
+    const done = team.filter(i => DONE_STATUS.has(i.status));
+    const pending = team.filter(i => i.status === "nodata");
+    const open = team.filter(i => !DONE_STATUS.has(i.status) && i.status !== "nodata");
+    L.push("");
+    L.push(`<b>🧩 Team tasks</b>: ${done.length}/${team.length} done`);
+    if (open.length) L.push(`still open: ${list(open)}`);
+    if (pending.length) L.push(`awaiting data: ${list(pending)}`);
+  }
+
   const tpAny = data.people.some(p => (p.tptasks || []).length || (p.tpweeks || []).length);
   if (tpAny){
     L.push("");
