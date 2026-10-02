@@ -192,7 +192,7 @@
   <details class="dash">
     <summary class="group">tP progress</summary>
     <div class="dashbody">
-      <div class="groupsub">Team tasks belong to the whole team; weekly progress is the weeks you personally committed code to the team repo, and individual tasks are the other tP items credited to you by name. Regenerated daily at source.</div>
+      <div class="groupsub">Weekly progress is the weeks you personally committed code to the team repo, and individual tasks are the other tP items credited to you by name. Regenerated daily at source.</div>
       <div id="tpsec"></div>
       <div class="legend">
         <span><span class="pill s-done">Done</span></span>
@@ -202,6 +202,22 @@
         <span><span class="pill s-soon-opt">Optional, due soon</span></span>
         <span><span class="pill s-nodata">No data yet</span></span>
         <span><span class="s-missing">&mdash;</span> not listed for that student</span>
+      </div>
+    </div>
+  </details>
+
+  <details class="dash">
+    <summary class="group">tP Progress - Team View</summary>
+    <div class="dashbody">
+      <div class="groupsub">Shared team tasks and the Java CI badge from the <em>tP progress (team)</em> dashboard, keyed by team id. Regenerated daily at source.</div>
+      <div id="tpteamsec"></div>
+      <div class="legend">
+        <span><span class="pill s-done">Done</span></span>
+        <span><span class="pill s-done-opt">Done (optional)</span></span>
+        <span><span class="pill s-overdue">Overdue</span></span>
+        <span><span class="pill s-soon">Due soon</span></span>
+        <span><span class="pill s-soon-opt">Optional, due soon</span></span>
+        <span><span class="pill s-nodata">No data yet</span></span>
       </div>
     </div>
   </details>
@@ -275,29 +291,46 @@ function board(people, key, title, unit, listed, showWatching){
     <tbody>${rows}</tbody></table></div></section>`;
 }
 
-// The tP dashboard's whole-team half: tasks nobody owns individually, so they
-// are listed once rather than per person, next to the repo's CI badge.
-function teamBand(data){
+// The tP team dashboard: one row per team — shared tasks plus the repo CI badge.
+function teamView(data){
   const tasks = data.teamTasks || [];
-  if (!tasks.length && !data.ci) return "";
+  const teamId = data.teamId || "";
+  if (!tasks.length && !data.ci){
+    return `<div class="sub">${teamId
+      ? `No row found for <span class="handle">${esc(teamId)}</span> on the tP team dashboard.`
+      : "No team id configured &mdash; set TEAM_NAME or TEAM_ID to your row id (e.g. CS2103T-T14-1)."}</div>`;
+  }
   const done = tasks.filter(t => DONE.has(t.status)).length;
   const pending = tasks.filter(t => t.status === "nodata").length;
-  const pills = tasks.map(t =>
-    `<span class="pill s-${t.status}"${t.status === "nodata"
-      ? ' title="The source has no data for this item yet"' : ""}>${esc(t.label)}</span>`).join("");
+  const statusTxt = {
+    "done": "Done", "done-opt": "Done (optional)", "overdue": "Overdue",
+    "soon": "Due soon", "soon-opt": "Optional, due soon", "nodata": "No data yet",
+  };
+  const head = `<th>Item</th><th>Status</th>`;
+  const body = tasks.map(t =>
+    `<tr><td class="item">${esc(t.label)}</td>
+       <td><span class="pill s-${t.status}"${t.status === "nodata"
+         ? ' title="The source has no data for this item yet"' : ""}>${
+         esc(statusTxt[t.status] || t.status)}</span></td></tr>`).join("");
+  const repo = data.repo
+    ? `<a href="${esc(data.repo)}" target="_blank" rel="noopener">${esc(teamId || "team repo")}</a>`
+    : esc(teamId || "Team");
   const ci = data.ci
     ? `<a href="${esc(data.repo || "#")}" target="_blank" rel="noopener" title="Java CI on the team repo">
          <img src="${esc(data.ci)}" alt="CI status" style="height:20px;vertical-align:middle"></a>`
-    : "";
-  return `<section><h3>Team tasks${data.teamId ? " &middot; " + esc(data.teamId) : ""}</h3>
-    <div class="tablewrap" style="padding:12px 14px">
-      <div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px">
-        ${pills || '<span class="sub">Nothing credited to the team yet.</span>'}
-        <span style="flex:1 1 auto"></span>${ci}
+    : '<span class="s-missing">—</span>';
+  return `<section><h3>Team &middot; ${repo}</h3>
+    <div class="tablewrap" style="padding:12px 14px;margin-bottom:12px">
+      <div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px;justify-content:space-between">
+        <span class="sub">${tasks.length
+          ? `${done} of ${tasks.length} done${pending ? ` &middot; ${pending} awaiting data` : ""}`
+          : "Nothing credited to the team yet."}</span>
+        <span>${ci}</span>
       </div>
-      ${tasks.length ? `<div class="sub" style="margin-top:9px">${done} of ${tasks.length} done${
-        pending ? ` &middot; ${pending} awaiting data` : ""}</div>` : ""}
-    </div></section>`;
+    </div>
+    ${tasks.length ? `<div class="tablewrap"><table style="min-width:0">
+      <thead><tr>${head}</tr></thead><tbody>${body}</tbody></table></div>` : ""}
+  </section>`;
 }
 
 function render(data, note){
@@ -407,11 +440,12 @@ function render(data, note){
 
   $("#ipsec").innerHTML = IPSECTIONS.map(([k, t, pre, cls]) => matrix(data.people, k, t, pre, cls)).join("");
 
-  const tp = teamBand(data)
-    + TPSECTIONS.map(([k, t, pre]) => matrix(data.people, k, t, pre)).join("")
+  const tp = TPSECTIONS.map(([k, t, pre]) => matrix(data.people, k, t, pre)).join("")
     || `<div class="sub">Nothing credited on the tP dashboard yet &mdash; it fills in once the team repo has commits and the individual tasks come due.</div>`;
   $("#tpsec").innerHTML = tp + (data.people.some(p => (p.tpweeks || []).length) ? ""
     : `<div class="sub">No weekly code activity on the team repo recorded yet.</div>`);
+
+  $("#tpteamsec").innerHTML = teamView(data);
 
   $("#cmtsec").innerHTML =
     board(data.people, "ipc", "iP review comments given", "Comments", data.ipcListed, false)
