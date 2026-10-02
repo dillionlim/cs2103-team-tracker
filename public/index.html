@@ -146,6 +146,41 @@
 
   <div class="cards" id="cards"></div>
 
+    <!-- tP progress - Individual View -->
+  <details class="dash">
+    <summary class="group">tP progress - Individual View</summary>
+    <div class="dashbody">
+      <div class="groupsub">Weekly progress is the weeks you personally committed code to the team repo, and individual tasks are the other tP items credited to you by name. Regenerated daily at source.</div>
+      <div id="tpsec"></div>
+      <div class="legend">
+        <span><span class="pill s-done">Done</span></span>
+        <span><span class="pill s-done-opt">Done (optional)</span></span>
+        <span><span class="pill s-overdue">Overdue</span></span>
+        <span><span class="pill s-soon">Due soon</span></span>
+        <span><span class="pill s-soon-opt">Optional, due soon</span></span>
+        <span><span class="pill s-nodata">No data yet</span></span>
+        <span><span class="s-missing">&mdash;</span> not listed for that student</span>
+      </div>
+    </div>
+  </details>
+
+  <!-- tP progress - Team View -->
+  <details class="dash">
+    <summary class="group">tP Progress - Team View</summary>
+    <div class="dashbody">
+      <div class="groupsub">Shared team tasks and the Java CI badge from the <em>tP progress (team)</em> dashboard, keyed by team id. Regenerated daily at source.</div>
+      <div id="tpteamsec"></div>
+      <div class="legend">
+        <span><span class="pill s-done">Done</span></span>
+        <span><span class="pill s-done-opt">Done (optional)</span></span>
+        <span><span class="pill s-overdue">Overdue</span></span>
+        <span><span class="pill s-soon">Due soon</span></span>
+        <span><span class="pill s-soon-opt">Optional, due soon</span></span>
+        <span><span class="pill s-nodata">No data yet</span></span>
+      </div>
+    </div>
+  </details>
+  
   <details class="dash">
     <summary class="group">Participation</summary>
     <div class="dashbody">
@@ -185,39 +220,6 @@
         <span><span class="pill s-soon-opt">Optional, due soon</span></span>
         <span><span class="s-missing">—</span> not listed for that student</span>
         <span><b>Weekly commit activity</b> asks only whether you pushed <em>any</em> commit inside that week's window (Fri 4:00 pm to next Fri 3:59 pm); it is not a measure of increments done. Finish everything early and push nothing this week and the week still comes up <span class="pill s-overdue">red</span>.</span>
-      </div>
-    </div>
-  </details>
-
-  <details class="dash">
-    <summary class="group">tP progress</summary>
-    <div class="dashbody">
-      <div class="groupsub">Weekly progress is the weeks you personally committed code to the team repo, and individual tasks are the other tP items credited to you by name. Regenerated daily at source.</div>
-      <div id="tpsec"></div>
-      <div class="legend">
-        <span><span class="pill s-done">Done</span></span>
-        <span><span class="pill s-done-opt">Done (optional)</span></span>
-        <span><span class="pill s-overdue">Overdue</span></span>
-        <span><span class="pill s-soon">Due soon</span></span>
-        <span><span class="pill s-soon-opt">Optional, due soon</span></span>
-        <span><span class="pill s-nodata">No data yet</span></span>
-        <span><span class="s-missing">&mdash;</span> not listed for that student</span>
-      </div>
-    </div>
-  </details>
-
-  <details class="dash">
-    <summary class="group">tP Progress - Team View</summary>
-    <div class="dashbody">
-      <div class="groupsub">Shared team tasks and the Java CI badge from the <em>tP progress (team)</em> dashboard, keyed by team id. Regenerated daily at source.</div>
-      <div id="tpteamsec"></div>
-      <div class="legend">
-        <span><span class="pill s-done">Done</span></span>
-        <span><span class="pill s-done-opt">Done (optional)</span></span>
-        <span><span class="pill s-overdue">Overdue</span></span>
-        <span><span class="pill s-soon">Due soon</span></span>
-        <span><span class="pill s-soon-opt">Optional, due soon</span></span>
-        <span><span class="pill s-nodata">No data yet</span></span>
       </div>
     </div>
   </details>
