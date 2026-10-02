@@ -66,10 +66,21 @@
   .cardsplit .wk .pill{display:inline-block;max-width:100%;
     overflow:hidden;text-overflow:ellipsis;vertical-align:middle}
 
-  .group{font-size:17px;letter-spacing:-.01em;margin:34px 0 4px;font-weight:600}
-  .groupsub{font-size:12.5px;color:var(--muted);margin-bottom:14px}
+  .dash{margin:28px 0 0;border:1px solid var(--line);border-radius:12px;background:var(--panel);overflow:hidden}
+  .dash > summary.group{list-style:none;display:flex;align-items:center;justify-content:space-between;
+    gap:12px;cursor:pointer;user-select:none;padding:14px 16px;margin:0;
+    font-size:17px;letter-spacing:-.01em;font-weight:600}
+  .dash > summary.group::-webkit-details-marker{display:none}
+  .dash > summary.group:hover{color:var(--accent)}
+  .dash > summary.group::after{content:"";width:.55em;height:.55em;flex:0 0 auto;
+    border-right:2px solid var(--muted);border-bottom:2px solid var(--muted);
+    transform:rotate(45deg);transition:transform .15s ease;margin-top:-.2em}
+  .dash[open] > summary.group::after{transform:rotate(225deg);margin-top:.15em}
+  .dash .dashbody{padding:0 16px 16px;border-top:1px solid var(--line)}
+  .groupsub{font-size:12.5px;color:var(--muted);margin:12px 0 14px}
   .groupsub a{color:var(--accent)}
   section{margin-bottom:22px}
+  .dash .legend{margin-top:12px}
   h3{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);
     margin:0 0 9px;font-weight:600}
   .tablewrap{overflow-x:auto;border:1px solid var(--line);border-radius:12px;background:var(--panel)}
@@ -135,57 +146,77 @@
 
   <div class="cards" id="cards"></div>
 
-  <div class="group">Participation</div>
-  <div class="groupsub">A week counts once you clear the <em>participation bar</em>: more than half that week's available points. Updated weekly at source.</div>
-  <div id="partsec"></div>
-  <div class="legend">
-    <span><span class="pill s-met">Bar reached</span></span>
-    <span><span class="pill s-short">Some points, short of bar</span></span>
-    <span><span class="pill s-none">No points</span></span>
-    <span>Letters are the source's own activity codes (<span class="code text-success">Q</span> quiz, plus <span class="code text-success">S</span> / <span class="code text-info">W</span> / <span class="code text-info">B</span>; the source doesn't expand them)</span>
-  </div>
+  <details class="dash">
+    <summary class="group">Participation</summary>
+    <div class="dashbody">
+      <div class="groupsub">A week counts once you clear the <em>participation bar</em>: more than half that week's available points. Updated weekly at source.</div>
+      <div id="partsec"></div>
+      <div class="legend">
+        <span><span class="pill s-met">Bar reached</span></span>
+        <span><span class="pill s-short">Some points, short of bar</span></span>
+        <span><span class="pill s-none">No points</span></span>
+        <span>Letters are the source's own activity codes (<span class="code text-success">Q</span> quiz, plus <span class="code text-success">S</span> / <span class="code text-info">W</span> / <span class="code text-info">B</span>; the source doesn't expand them)</span>
+      </div>
+    </div>
+  </details>
 
-  <div class="group">Forum activity</div>
-  <div class="groupsub">Post counts from the forum dashboard, matched by GitHub handle. Anyone not listed there has posted nothing yet. Updated weekly at source.</div>
-  <div id="forumsec"></div>
-  <div class="legend">
-    <span><span class="eye">&#128065;</span> watching the forum (kudos from the teaching team)</span>
-    <span>Rank is position in the source's full leaderboard.</span>
-  </div>
+  <details class="dash">
+    <summary class="group">Forum activity</summary>
+    <div class="dashbody">
+      <div class="groupsub">Post counts from the forum dashboard, matched by GitHub handle. Anyone not listed there has posted nothing yet. Updated weekly at source.</div>
+      <div id="forumsec"></div>
+      <div class="legend">
+        <span><span class="eye">&#128065;</span> watching the forum (kudos from the teaching team)</span>
+        <span>Rank is position in the source's full leaderboard.</span>
+      </div>
+    </div>
+  </details>
 
-  <div class="group">iP progress</div>
-  <div class="groupsub">Increment tags and Git/GitHub items. Regenerated daily at source; if something you did isn't green, check the tag was pushed and named exactly.</div>
-  <div id="ipsec"></div>
-  <div class="legend">
-    <span><span class="pill s-done">Done</span></span>
-    <span><span class="pill s-done-opt">Done (optional)</span></span>
-    <span><span class="pill s-overdue">Overdue</span></span>
-    <span><span class="pill s-soon">Due soon</span></span>
-    <span><span class="pill s-soon-opt">Optional, due soon</span></span>
-    <span><span class="s-missing">—</span> not listed for that student</span>
-    <span><b>Weekly commit activity</b> asks only whether you pushed <em>any</em> commit inside that week's window (Fri 4:00 pm to next Fri 3:59 pm); it is not a measure of increments done. Finish everything early and push nothing this week and the week still comes up <span class="pill s-overdue">red</span>.</span>
-  </div>
+  <details class="dash">
+    <summary class="group">iP progress</summary>
+    <div class="dashbody">
+      <div class="groupsub">Increment tags and Git/GitHub items. Regenerated daily at source; if something you did isn't green, check the tag was pushed and named exactly.</div>
+      <div id="ipsec"></div>
+      <div class="legend">
+        <span><span class="pill s-done">Done</span></span>
+        <span><span class="pill s-done-opt">Done (optional)</span></span>
+        <span><span class="pill s-overdue">Overdue</span></span>
+        <span><span class="pill s-soon">Due soon</span></span>
+        <span><span class="pill s-soon-opt">Optional, due soon</span></span>
+        <span><span class="s-missing">—</span> not listed for that student</span>
+        <span><b>Weekly commit activity</b> asks only whether you pushed <em>any</em> commit inside that week's window (Fri 4:00 pm to next Fri 3:59 pm); it is not a measure of increments done. Finish everything early and push nothing this week and the week still comes up <span class="pill s-overdue">red</span>.</span>
+      </div>
+    </div>
+  </details>
 
-  <div class="group">tP progress</div>
-  <div class="groupsub">Team tasks belong to the whole team; weekly progress is the weeks you personally committed code to the team repo, and individual tasks are the other tP items credited to you by name. Regenerated daily at source.</div>
-  <div id="tpsec"></div>
-  <div class="legend">
-    <span><span class="pill s-done">Done</span></span>
-    <span><span class="pill s-done-opt">Done (optional)</span></span>
-    <span><span class="pill s-overdue">Overdue</span></span>
-    <span><span class="pill s-soon">Due soon</span></span>
-    <span><span class="pill s-soon-opt">Optional, due soon</span></span>
-    <span><span class="pill s-nodata">No data yet</span></span>
-    <span><span class="s-missing">&mdash;</span> not listed for that student</span>
-  </div>
+  <details class="dash">
+    <summary class="group">tP progress</summary>
+    <div class="dashbody">
+      <div class="groupsub">Team tasks belong to the whole team; weekly progress is the weeks you personally committed code to the team repo, and individual tasks are the other tP items credited to you by name. Regenerated daily at source.</div>
+      <div id="tpsec"></div>
+      <div class="legend">
+        <span><span class="pill s-done">Done</span></span>
+        <span><span class="pill s-done-opt">Done (optional)</span></span>
+        <span><span class="pill s-overdue">Overdue</span></span>
+        <span><span class="pill s-soon">Due soon</span></span>
+        <span><span class="pill s-soon-opt">Optional, due soon</span></span>
+        <span><span class="pill s-nodata">No data yet</span></span>
+        <span><span class="s-missing">&mdash;</span> not listed for that student</span>
+      </div>
+    </div>
+  </details>
 
-  <div class="group">Review comments</div>
-  <div class="groupsub">Review comments given on <em>others&rsquo;</em> PRs, matched by GitHub handle. Anyone not listed at source has given none. Updated weekly at source.</div>
-  <div id="cmtsec"></div>
-  <div class="legend">
-    <span>Rank is position in the source's full leaderboard.</span>
-    <span>The tP comments dashboard stays empty until the teaching team starts publishing it.</span>
-  </div>
+  <details class="dash">
+    <summary class="group">Review comments</summary>
+    <div class="dashbody">
+      <div class="groupsub">Review comments given on <em>others&rsquo;</em> PRs, matched by GitHub handle. Anyone not listed at source has given none. Updated weekly at source.</div>
+      <div id="cmtsec"></div>
+      <div class="legend">
+        <span>Rank is position in the source's full leaderboard.</span>
+        <span>The tP comments dashboard stays empty until the teaching team starts publishing it.</span>
+      </div>
+    </div>
+  </details>
 
   <footer>The Worker fetches and parses all seven source dashboards at the edge and hands this page a few KB of JSON, refreshed on load, on the interval above, and whenever you return to the tab. If one source fails the others still render and the status line names the one that did not.</footer>
 </div>
